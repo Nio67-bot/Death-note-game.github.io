@@ -207,151 +207,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* =============================================
-     9. SINGLE-IMAGE UPLOAD (character / story slots)
-  ============================================== */
-  function setupSingleImageUpload(inputId, slotId) {
-    const input = document.getElementById(inputId);
-    const slot  = document.getElementById(slotId);
-    if (!input || !slot) return;
-
-    input.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file || !file.type.startsWith('image/')) return;
-
-      const reader = new FileReader();
-      reader.onload = (re) => {
-        let img = slot.querySelector('img.uploaded-img');
-        if (!img) {
-          img = document.createElement('img');
-          img.className = 'uploaded-img';
-          img.alt = 'Uploaded image';
-          slot.insertBefore(img, slot.firstChild);
-        }
-        img.src = re.target.result;
-        img.style.opacity    = '0';
-        img.style.transition = 'opacity 0.4s ease';
-        requestAnimationFrame(() => { img.style.opacity = '1'; });
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  setupSingleImageUpload('storyImageInput', 'storyImgSlot');
-  setupSingleImageUpload('lightImageInput', 'lightImgSlot');
-  setupSingleImageUpload('ryukImageInput',  'ryukImgSlot');
-  setupSingleImageUpload('detImageInput',   'detImgSlot');
-
-
-  /* =============================================
-     10. GALLERY — multi-image upload & management
-  ============================================== */
-  const galleryInput = document.getElementById('galleryInput');
-  const galleryGrid  = document.getElementById('galleryGrid');
-  const clearBtn     = document.getElementById('clearGallery');
-
-  // Track uploaded images: { src, name } or null if deleted
-  let galleryImages = [];
-
-  function addGalleryTile(src, name, idx) {
-    // Remove placeholders on first real upload
-    if (galleryImages.filter(Boolean).length === 1) {
-      galleryGrid.querySelectorAll('.placeholder-tile').forEach(p => p.remove());
-    }
-
-    const tile = document.createElement('div');
-    tile.className = 'gallery-tile';
-    tile.setAttribute('role', 'listitem');
-    tile.dataset.idx = idx;
-
-    const img       = document.createElement('img');
-    img.src         = src;
-    img.alt         = name;
-    img.loading     = 'lazy';
-    tile.appendChild(img);
-
-    const cap       = document.createElement('span');
-    cap.className   = 'tile-caption';
-    cap.textContent = name;
-    tile.appendChild(cap);
-
-    const del       = document.createElement('button');
-    del.className   = 'tile-delete';
-    del.textContent = '✕';
-    del.setAttribute('aria-label', `Remove ${name}`);
-    del.addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeTile(tile, idx);
-    });
-    tile.appendChild(del);
-
-    tile.addEventListener('click', () => openLightbox(idx));
-
-    // Fade in
-    tile.style.opacity   = '0';
-    tile.style.transform = 'scale(0.92)';
-    galleryGrid.appendChild(tile);
-    requestAnimationFrame(() => {
-      tile.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-      tile.style.opacity    = '1';
-      tile.style.transform  = 'scale(1)';
-    });
-  }
-
-  function removeTile(tile, idx) {
-    tile.style.transition = 'opacity 0.3s, transform 0.3s';
-    tile.style.opacity    = '0';
-    tile.style.transform  = 'scale(0.88)';
-    setTimeout(() => {
-      tile.remove();
-      galleryImages[idx] = null;
-      if (!galleryImages.filter(Boolean).length) restorePlaceholders();
-    }, 300);
-  }
-
-  function restorePlaceholders() {
-    galleryGrid.innerHTML = `
-      <div class="gallery-tile placeholder-tile" aria-label="Gallery slot 1">
-        <div class="tile-inner"><span class="tile-label">Scene 1</span><p class="tile-hint">Upload an image</p></div>
-      </div>
-      <div class="gallery-tile placeholder-tile tall" aria-label="Gallery slot 2">
-        <div class="tile-inner"><span class="tile-label">Scene 2</span><p class="tile-hint">Upload an image</p></div>
-      </div>
-      <div class="gallery-tile placeholder-tile" aria-label="Gallery slot 3">
-        <div class="tile-inner"><span class="tile-label">Scene 3</span><p class="tile-hint">Upload an image</p></div>
-      </div>
-      <div class="gallery-tile placeholder-tile wide" aria-label="Gallery slot 4">
-        <div class="tile-inner"><span class="tile-label">Scene 4</span><p class="tile-hint">Upload an image</p></div>
-      </div>
-      <div class="gallery-tile placeholder-tile" aria-label="Gallery slot 5">
-        <div class="tile-inner"><span class="tile-label">Scene 5</span><p class="tile-hint">Upload an image</p></div>
-      </div>`;
-    galleryImages = [];
-  }
-
-  galleryInput.addEventListener('change', (e) => {
-    Array.from(e.target.files).forEach(file => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (re) => {
-        const idx = galleryImages.length;
-        galleryImages.push({ src: re.target.result, name: file.name });
-        addGalleryTile(re.target.result, file.name, idx);
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
-  });
-
-  clearBtn.addEventListener('click', restorePlaceholders);
-
-
-  /* =============================================
-     11. LIGHTBOX
-     FIX: the old code used element.hidden = true/false
-     but the CSS rule "display: flex" on .lightbox
-     overrides the browser's hidden attribute style,
-     making the lightbox visible on page load.
-     Solution: use a CSS class .lightbox--open instead.
+     9. LIGHTBOX (static gallery support)
+     Works with the 6 static <img> in #galleryGrid.
+     Click any loaded gallery tile to open.
+     Prev/Next cycle through available scenes.
   ============================================== */
   const lightbox  = document.getElementById('lightbox');
   const lbImg     = document.getElementById('lbImg');
@@ -362,76 +221,108 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let lightboxIndex = 0;
 
-  // Make sure lightbox starts hidden regardless of HTML attribute
-  lightbox.style.display = 'none';
+  // Make sure lightbox starts hidden
+  if (lightbox) lightbox.style.display = 'none';
+
+  // Build list of static gallery images from DOM (supports missing via onerror)
+  const galleryTiles = document.querySelectorAll('#galleryGrid .gallery-tile');
+  const staticGallery = [];
+
+  galleryTiles.forEach((tile, i) => {
+    const img = tile.querySelector('img.slot-img');
+    const cap = tile.querySelector('.tile-caption');
+    if (img) {
+      staticGallery.push({
+        src: img.src || img.getAttribute('src'),
+        alt: img.alt || `Scene ${i + 1}`,
+        name: cap ? cap.textContent.trim() : `Scene ${i + 1}`,
+        index: i
+      });
+
+      // Enable lightbox click on tiles that have (or will have) images
+      tile.style.cursor = 'zoom-in';
+      tile.addEventListener('click', () => {
+        // Only open if image not in missing state
+        if (!img.classList.contains('img-missing') && img.src) {
+          openLightbox(i);
+        }
+      });
+    }
+  });
 
   function openLightbox(idx) {
-    const valid = galleryImages
-      .map((img, i) => ({ img, i }))
-      .filter(({ img }) => img !== null);
+    if (!staticGallery.length) return;
 
-    if (!valid.length) return;
+    // find the entry by original tile index
+    let entry = staticGallery.find(e => e.index === idx);
+    if (!entry) entry = staticGallery[0];
+    lightboxIndex = entry.index;
 
-    const entry   = valid.find(({ i }) => i === idx) || valid[0];
-    lightboxIndex = entry.i;
+    lbImg.src = entry.src;
+    lbImg.alt = entry.alt;
+    lbCaption.textContent = entry.name;
 
-    lbImg.src             = entry.img.src;
-    lbImg.alt             = entry.img.name;
-    lbCaption.textContent = entry.img.name;
-
-    // Use display instead of hidden attribute to avoid CSS override
     lightbox.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
-    lbPrev.style.display = valid.length > 1 ? 'flex' : 'none';
-    lbNext.style.display = valid.length > 1 ? 'flex' : 'none';
-  }
-
-  function closeLightbox() {
-    lightbox.style.display = 'none';
-    document.body.style.overflow = '';
-    lbImg.src = '';
+    const hasMultiple = staticGallery.length > 1;
+    if (lbPrev) lbPrev.style.display = hasMultiple ? 'flex' : 'none';
+    if (lbNext) lbNext.style.display = hasMultiple ? 'flex' : 'none';
   }
 
   function navigateLightbox(dir) {
-    const valid = galleryImages
-      .map((img, i) => ({ img, i }))
-      .filter(({ img }) => img !== null);
+    if (!staticGallery.length) return;
 
-    if (valid.length < 2) return;
+    const currentPos = staticGallery.findIndex(e => e.index === lightboxIndex);
+    if (currentPos === -1) return;
 
-    const pos   = valid.findIndex(({ i }) => i === lightboxIndex);
-    const entry = valid[(pos + dir + valid.length) % valid.length];
-    lightboxIndex = entry.i;
+    const nextPos = (currentPos + dir + staticGallery.length) % staticGallery.length;
+    const entry = staticGallery[nextPos];
+    lightboxIndex = entry.index;
 
-    lbImg.style.opacity    = '0';
-    lbImg.style.transform  = dir > 0 ? 'translateX(30px)' : 'translateX(-30px)';
-    lbImg.style.transition = 'opacity 0.2s, transform 0.2s';
+    // subtle slide animation
+    lbImg.style.transition = 'none';
+    lbImg.style.opacity = '0';
+    lbImg.style.transform = dir > 0 ? 'translateX(40px)' : 'translateX(-40px)';
 
     setTimeout(() => {
-      lbImg.src             = entry.img.src;
-      lbImg.alt             = entry.img.name;
-      lbCaption.textContent = entry.img.name;
-      lbImg.style.transform = dir > 0 ? 'translateX(-30px)' : 'translateX(30px)';
+      lbImg.src = entry.src;
+      lbImg.alt = entry.alt;
+      lbCaption.textContent = entry.name;
+
+      lbImg.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+      lbImg.style.transform = dir > 0 ? 'translateX(-20px)' : 'translateX(20px)';
       requestAnimationFrame(() => {
-        lbImg.style.opacity   = '1';
+        lbImg.style.opacity = '1';
         lbImg.style.transform = 'translateX(0)';
       });
-    }, 200);
+    }, 180);
   }
 
-  lbClose.addEventListener('click', closeLightbox);
-  lbPrev.addEventListener('click',  () => navigateLightbox(-1));
-  lbNext.addEventListener('click',  () => navigateLightbox(+1));
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.style.display = 'none';
+    document.body.style.overflow = '';
+    if (lbImg) lbImg.src = '';
+  }
 
-  // Close on backdrop click (outside image wrapper)
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox) closeLightbox();
-  });
+  // Note: navigateLightbox already defined above for static gallery.
+  // The old dynamic version was removed.
+
+  if (lbClose) lbClose.addEventListener('click', closeLightbox);
+  if (lbPrev) lbPrev.addEventListener('click',  () => navigateLightbox(-1));
+  if (lbNext) lbNext.addEventListener('click',  () => navigateLightbox(+1));
+
+  // Close on backdrop click
+  if (lightbox) {
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+  }
 
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
-    if (lightbox.style.display === 'none') return;
+    if (!lightbox || lightbox.style.display === 'none') return;
     if (e.key === 'Escape')     closeLightbox();
     if (e.key === 'ArrowRight') navigateLightbox(+1);
     if (e.key === 'ArrowLeft')  navigateLightbox(-1);
@@ -588,38 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* =============================================
-     18. DRAG-AND-DROP on gallery section
-  ============================================== */
-  const gallerySection = document.getElementById('gallery');
-
-  if (gallerySection) {
-    gallerySection.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      gallerySection.style.outline = '2px dashed #c0392b';
-    });
-    gallerySection.addEventListener('dragleave', () => {
-      gallerySection.style.outline = '';
-    });
-    gallerySection.addEventListener('drop', (e) => {
-      e.preventDefault();
-      gallerySection.style.outline = '';
-      Array.from(e.dataTransfer.files)
-        .filter(f => f.type.startsWith('image/'))
-        .forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (re) => {
-            const idx = galleryImages.length;
-            galleryImages.push({ src: re.target.result, name: file.name });
-            addGalleryTile(re.target.result, file.name, idx);
-          };
-          reader.readAsDataURL(file);
-        });
-    });
-  }
-
-
-  /* =============================================
-     19. NOTEBOOK PARALLAX (desktop only)
+     10. NOTEBOOK PARALLAX (desktop only)
   ============================================== */
   const heroNotebook = document.querySelector('.hero-notebook');
 
