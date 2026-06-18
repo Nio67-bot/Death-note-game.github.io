@@ -1307,6 +1307,114 @@ kbd {
   transform: translateY(0);
 }
 
+/* =============================================
+   IMAGE SLOTS & PLACEHOLDERS
+   Supports static images/ folder for story, characters, gallery.
+   Shows hint when image missing (onerror adds .img-missing).
+   Hides placeholder automatically when image loads successfully.
+   ============================================= */
+.img-slot {
+  position: relative;
+  overflow: hidden;
+  background: #111111;
+  border: 1px solid var(--clr-border);
+  border-radius: 2px;
+  aspect-ratio: 16 / 9; /* default, overridden below */
+  height: auto;
+}
+
+/* Specific aspect ratios matching design intent */
+.story-image-panel .img-slot {
+  aspect-ratio: 4 / 3;
+}
+
+.char-image-wrap .img-slot {
+  aspect-ratio: 3 / 2;
+}
+
+.slot-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+/* When image fails to load */
+.slot-img.img-missing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Placeholder overlay - shown by default, hidden only if sibling img has no error class */
+.slot-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(160deg, #1a0a08, #0a0a0a);
+  color: var(--clr-muted);
+  padding: 1.25rem;
+  text-align: center;
+  border-radius: 2px;
+}
+
+/* Hide placeholder when a valid image is present (adjacent sibling) */
+.img-slot img.slot-img:not(.img-missing) + .slot-placeholder,
+.gallery-tile img.slot-img:not(.img-missing) + .slot-placeholder {
+  display: none;
+}
+
+.slot-placeholder svg {
+  width: 64px;
+  height: 64px;
+  stroke: var(--clr-crimson);
+  opacity: 0.65;
+}
+
+.slot-placeholder .slot-hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  color: var(--clr-crimson);
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+.slot-placeholder code {
+  background: rgba(192,57,43,0.1);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+/* Gallery-specific placeholder tweaks (tile-label inside) */
+.gallery-tile .slot-placeholder {
+  background: rgba(8, 8, 8, 0.85);
+  padding: 1rem;
+}
+
+.gallery-tile .slot-placeholder .tile-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--clr-crimson);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.gallery-tile .slot-placeholder p {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--clr-muted);
+}
+
 /* ---- Lightbox ---- */
 .lightbox {
   position: fixed;
